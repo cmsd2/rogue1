@@ -41,6 +41,7 @@ impl <A> ChordTree<A> where A: Debug {
         }
     }
 
+    #[allow(dead_code)]
     pub fn remove<'a, K>(&mut self, keys: K) where K: IntoIterator<Item=&'a ChordKey> {
         let mut keys = keys.into_iter();
         if let Some(key) = keys.next() {
@@ -65,6 +66,7 @@ impl <A> ChordTree<A> where A: Debug {
         }
     }
 
+    #[allow(dead_code)]
     pub fn clear(&mut self) {
         self.keys.clear();
     }

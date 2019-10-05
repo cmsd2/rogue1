@@ -94,33 +94,27 @@ impl KeyRepeatTimer {
     }
 }
 
-pub trait InputListener {
-    fn button_event(&mut self, args: InputEvent);
-}
-
-impl <F> InputListener for F where F: Fn(InputEvent) -> () + 'static {
-    fn button_event(&mut self, args: InputEvent) {
-        self(args)
-    }
-}
-
 pub struct InputHandler {
     pressed: HashMap<KeyboardKey,KeyRepeatTimer>,
     pub button_repeat_delay: f64,
     pub button_repeat_initial_delay: f64,
-    pub listener: Box<dyn InputListener>,
     pub modifier_keys: keyboard::ModifierKey,
 }
 
+impl Default for InputHandler {
+    fn default() -> Self {
+        InputHandler::new((0.2, 0.1))
+    }
+}
+
 impl InputHandler {
-    pub fn new<F>(button_repeat_delay: (f64, f64), listener: F) -> Self where F: InputListener + 'static {
+    pub fn new(button_repeat_delay: (f64, f64)) -> Self {
         let (initial, thereafter) = button_repeat_delay;
 
         InputHandler {
             pressed: HashMap::new(),
             button_repeat_initial_delay: initial,
             button_repeat_delay: thereafter,
-            listener: Box::new(listener),
             modifier_keys: keyboard::ModifierKey::default(),
         }
     }
@@ -129,10 +123,11 @@ impl InputHandler {
         self.pressed.contains_key(&KeyboardKey::from(button))
     }
 
-    pub fn press(&mut self, button: &ButtonArgs) {
+    pub fn press(&mut self, button: &ButtonArgs) -> Vec<InputEvent> {
+        let mut events = vec![];
         match self.pressed.entry(KeyboardKey::from(button)) {
             Entry::Vacant(v) => {
-                self.listener.button_event(InputEvent {
+                events.push(InputEvent {
                     state: InputEventType::KeyDown,
                     key: InputEventKey::new(*v.key(), self.modifier_keys),
                     modifiers: self.modifier_keys
@@ -141,42 +136,49 @@ impl InputHandler {
             },
             _ => {}
         }
+        events
     }
 
-    pub fn unpress(&mut self, button: &ButtonArgs) {
+    pub fn unpress(&mut self, button: &ButtonArgs) -> Vec<InputEvent> {
+        let mut events = vec![];
         if self.pressed.remove(&KeyboardKey::from(button)).is_some() {
-            self.listener.button_event(InputEvent {
+            events.push(InputEvent {
                 state: InputEventType::KeyUp,
                 key: InputEventKey::new(KeyboardKey::from(button), self.modifier_keys),
                 modifiers: self.modifier_keys
             });
         }
+        events
     }
 
-    pub fn event(&mut self, e: &Event) {
+    pub fn event(&mut self, e: &Event) -> Vec<InputEvent> {
+        let mut events = vec![];
         self.modifier_keys.event(e);
 
         if let Some(b) = e.button_args() {
-            self.button(&b);
+            events.append(&mut self.button(&b));
         }
 
         if let Some(u) = e.update_args() {
-            self.update(&u);
+            events.append(&mut self.update(&u));
         }
+
+        events
     }
 
-    pub fn button(&mut self, args: &ButtonArgs) {
+    pub fn button(&mut self, args: &ButtonArgs) -> Vec<InputEvent> {
         match args.state {
             ButtonState::Press => {
-                self.press(args);
+                self.press(args)
             },
             ButtonState::Release => {
-                self.unpress(args);
-            }
+                self.unpress(args)
+            },
         }
     }
 
-    pub fn update(&mut self, args: &UpdateArgs) {
+    pub fn update(&mut self, args: &UpdateArgs) -> Vec<InputEvent> {
+        let mut events = vec![];
         for (k,v) in self.pressed.iter_mut() {
             v.elapsed += args.dt;
 
@@ -184,8 +186,9 @@ impl InputHandler {
                 v.elapsed -= v.button_repeat_delay;
                 v.button_repeat_delay = self.button_repeat_delay;
 
-                self.listener.button_event(InputEvent { state: InputEventType::KeyRepeat, key: InputEventKey::new(*k, self.modifier_keys), modifiers: self.modifier_keys });
+                events.push(InputEvent { state: InputEventType::KeyRepeat, key: InputEventKey::new(*k, self.modifier_keys), modifiers: self.modifier_keys });
             }
         }
+        events
     }
 }

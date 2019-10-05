@@ -1,30 +1,37 @@
 use piston::Size;
 use piston::window::WindowSettings;
-use piston::event_loop::*;
-use piston::input::*;
-use piston::input::keyboard::ModifierKey;
 use glfw_window::GlfwWindow;
-use opengl_graphics::{ GlGraphics, OpenGL, GlyphCache, TextureSettings };
-use graphics::Graphics;
-use graphics::context::Context;
-use graphics::types::{Color, FontSize};
-use graphics::character::CharacterCache;
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::cmp;
+use opengl_graphics::{ GlGraphics, OpenGL };
+use std::path::Path;
+use specs::{World, DispatcherBuilder, WorldExt};
 
-pub mod grid;
 pub mod input;
 pub mod charmap;
 pub mod chords;
 pub mod euclid;
 pub mod commands;
-pub mod window;
 pub mod app;
+pub mod ai;
+pub mod glfw_system;
+pub mod color;
+pub mod scene;
+pub mod pane;
+pub mod level;
+pub mod level_gen;
+pub mod ecs;
+pub mod features;
+pub mod level_view;
+pub mod events;
+pub mod game;
 
 use commands::{Commands};
-use grid::{Drawable, View};
+use app::App;
+use glfw_system::GlfwSystem;
+use ai::system::AiSystem;
+use ai::Ai;
+use input::InputHandler;
+use game::{GameActor, GameSystem, GameEventQueue};
+use events::Time;
 
 pub struct Scaler {
     pub scale_x: f64,
@@ -53,14 +60,8 @@ impl Scaler {
     }
 }
 
-fn main() {
-    // Change this to OpenGL::V2_1 if not working.
-    let opengl = OpenGL::V3_2;
-
-    let scaler = Scaler::new(2.25);
-
-    // Create an Glutin window.
-    let mut window: GlfwWindow = WindowSettings::new(
+fn create_window(opengl: OpenGL, scaler: Scaler) -> GlfwWindow {
+    WindowSettings::new(
             "spinning-square",
             scaler.scale((200,200))
         )
@@ -68,50 +69,103 @@ fn main() {
         .exit_on_esc(true)
         .fullscreen(false)
         .build()
-        .unwrap();
-
+        .unwrap()
+}
+/*
+fn create_app<'a>(opengl: OpenGL, scaler: Scaler) -> App<'a> {
     let font = "UbuntuMono-R.ttf";
     let glyphs = GlyphCache::new(font, (), TextureSettings::new()).unwrap();
 
-    let app = Rc::new(RefCell::new(app::App::new(
+    let app = app::App::new(
         GlGraphics::new(opengl),
         Rc::new(RefCell::new(glyphs)),
         32,
         scaler.scale((200.0, 200.0)),
         [1.0, 0.0, 0.0, 1.0],
-    )));
+    );
 
-    let prompt_window_id = {
-        let mut window_app = app.borrow_mut();
-        let root_window = window_app.root_window();
+    app
+}
 
-        let main_window = {
-            let mut root_window_mut = root_window.borrow_mut();
-            root_window_mut.create_child_window(&mut *window_app)
-        };
+fn create_main_window(app: Rc<RefCell<App>>) -> WindowId {
+    let mut window_app = app.borrow_mut();
+    let root_window = window_app.root_window();
+    let mut root_window_mut = root_window.borrow_mut();
+    let main_window = root_window_mut.create_child_window(&mut *window_app);
 
-        let main_window_id = {
-            let mut main_window = main_window.borrow_mut();
-            let root_window_mut = root_window.borrow_mut();
-            main_window.resize(root_window_mut.size().subtract(grid::Size { w: 0, h: 1 }));
-            main_window.id()
-        };
-        
-        let prompt_window_id = {
-            let mut root_window_mut = root_window.borrow_mut();
-            let prompt_window = root_window_mut.create_child_window(&mut *window_app);
+    let main_window_mut = main_window.borrow_mut();
+    main_window_mut.resize(root_window_mut.size().subtract(grid::Size { w: 0, h: 1 }));
+    window_app.focus(main_window_mut.id());
+    main_window_mut.id()
+}
 
-            let mut prompt_window = prompt_window.borrow_mut();
-            prompt_window.resize(grid::Size { w: root_window_mut.size().w, h: 1 });
-            prompt_window.set_pos(grid::Pos { x: 0, y: root_window_mut.size().h as i32 - 1 });
-            prompt_window.id()
-        };
+fn create_prompt_window(app: Rc<RefCell<App>>) -> WindowId {
+    let mut window_app = app.borrow_mut();
+    let root_window = window_app.root_window();
+    let mut root_window_mut = root_window.borrow_mut();
+    let prompt_window = root_window_mut.create_child_window(&mut *window_app);
 
-        window_app.focus(main_window_id);
+    let mut prompt_window_mut = prompt_window.borrow_mut();
+    prompt_window_mut.resize(grid::Size { w: root_window_mut.size().w, h: 1 });
+    prompt_window_mut.set_pos(grid::Pos { x: 0, y: root_window_mut.size().h as i32 - 1 });
+    prompt_window_mut.id()
+}
+*/
 
-        prompt_window_id
-    };
+fn main() {
+    let scaler = Scaler::new(2.25);
+    // Change this to OpenGL::V2_1 if not working.
+    let opengl = OpenGL::V3_2;
 
+    // Create an Glutin window.
+    let window = create_window(opengl, scaler);
+
+    let mut world = World::new();
+    let mut dispatcher = DispatcherBuilder::new()
+        // .with(PlayerSystem, "player_system", &[])
+        .with(AiSystem, "ai_system", &[])
+        .with(GameSystem::new(), "game_system", &[])
+        .with_thread_local(GlfwSystem::new(window, GlGraphics::new(opengl), Path::new("UbuntuMono-R.ttf"), 32, [1.0, 0.0, 0.0, 1.0]))
+        .build();
+    
+    world.register::<ecs::Position>();
+    world.register::<ecs::Character>();
+    world.register::<ecs::Attributes>();
+    world.register::<ecs::AiController>();
+    world.register::<ecs::Fighter>();
+
+    dispatcher.setup(&mut world);
+
+    world.insert(InputHandler::default());
+    world.insert(Commands::default());
+    world.insert(GameEventQueue::default());
+
+    let mut app = App::default();
+    let mut level = level::Level::empty(tui::layout::Rect::new(0, 0, 80, 25));
+    let entities = level_gen::make_map(&color::ColorMap::default(), &mut level, &mut world);
+    let player_entity = level_gen::create_player(&mut level, &mut world);
+    
+    app.schedule_turn(Time::default(), GameActor::Player(player_entity));
+    for entity in entities {
+        app.schedule_turn(Time::default(), GameActor::NonPlayer(entity));
+    }
+
+    world.insert(level);
+    world.insert(app);
+    world.insert(Ai::default());
+
+    loop {
+        dispatcher.dispatch(&mut world);
+        world.maintain();
+
+        {
+			let app = world.read_resource::<App>();
+			if app.is_finished() {
+				break;
+			}
+		}
+    }
+/*
     let input_app = app.clone();
     let mut input_handler = input::InputHandler::new((0.2,0.1), move |kev: input::InputEvent| {
         let mut app = input_app.borrow_mut();
@@ -144,4 +198,5 @@ fn main() {
             app.update(&u);
         }
     }
+    */
 }

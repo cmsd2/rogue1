@@ -5,10 +5,10 @@ use crate::input;
 use crate::commands;
 use crate::charmap;
 use crate::grid::{Pos, Size, Grid, Drawable};
-use snowflake::ProcessUniqueId;
 use piston::UpdateArgs;
+use specs::world::Entity;
 
-pub type Id = ProcessUniqueId;
+pub type WindowId = Entity;
 
 pub trait WindowFactory {
     fn create_window(&mut self) -> Rc<RefCell<Window>>;
@@ -56,13 +56,12 @@ impl Cursor {
 }
 
 pub struct Window {
-    id: Id,
     pub cursor: Cursor,
     pub pos: Pos,
     pub blank_char: char,
     pub grid: Grid,
     pub color: [f32; 4],
-    pub children: Vec<Id>,
+    pub children: Vec<WindowId>,
     pub visible: bool,
 }
 
@@ -70,10 +69,8 @@ impl Window {
     pub fn new(size: Size) -> Window {
         let blank_char = ' ';
         let color = [0.0, 0.0, 0.0, 1.0];
-        let id = Id::new();
 
         Window {
-            id: id,
             cursor: Cursor::new(),
             pos: Pos::new(),
             blank_char,
@@ -84,27 +81,16 @@ impl Window {
         }
     }
 
-    pub fn create_child_window<F>(&mut self, window_factory: &mut F) -> Rc<RefCell<Window>> where F: WindowFactory {
-        let window = window_factory.create_window();
-        let id = window.borrow().id();
-        self.children.push(id);
-        window
-    }
-
-    pub fn children<'a>(&'a self) -> &'a Vec<Id> {
+    pub fn children<'a>(&'a self) -> &'a Vec<WindowId> {
         &self.children
     }
 
-    pub fn children_mut<'a>(&'a mut self) -> &'a mut Vec<Id> {
+    pub fn children_mut<'a>(&'a mut self) -> &'a mut Vec<WindowId> {
         &mut self.children
     }
 
     pub fn update(&mut self, args: &UpdateArgs) {
         self.cursor.update(args);
-    }
-
-    pub fn id(&self) -> Id {
-        self.id
     }
 
     pub fn size(&self) -> Size {

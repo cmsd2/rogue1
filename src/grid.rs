@@ -171,6 +171,12 @@ pub struct Grid {
     pub height: u32,
 }
 
+impl Default for Grid {
+    fn default() -> Self {
+        Grid::new(' ', 0, 0, [0.0, 0.0, 0.0, 1.0])
+    }
+}
+
 impl Grid {
     pub fn new(blank: char, width: u32, height: u32, color: [f32; 4]) -> Self {
         let mut rows = vec![];

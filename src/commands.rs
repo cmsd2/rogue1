@@ -13,7 +13,7 @@ pub const DOWN: &'static str = "down";
 pub const QUIT: &'static str = "quit";
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Action {
+pub enum Command {
     NewLine,
     Backspace,
     Left,
@@ -24,30 +24,36 @@ pub enum Action {
 }
 
 pub struct Commands {
-    pub chords: Chords<Action>,
+    pub chords: Chords<Command>,
+}
+
+impl Default for Commands {
+    fn default() -> Self {
+        Commands::new()
+    }
 }
 
 impl Commands {
     pub fn new() -> Self {
         let mut chords = Chords::new();
 
-        chords.register(&[ChordKey::Key(Key::Return, ModifierKey::NO_MODIFIER)], Action::NewLine, NEW_LINE);
-        chords.register(&[ChordKey::Key(Key::Backspace, ModifierKey::NO_MODIFIER)], Action::Backspace, BACKSPACE);
-        chords.register(&[ChordKey::Key(Key::Left, ModifierKey::NO_MODIFIER)], Action::Left, LEFT);
-        chords.register(&[ChordKey::Key(Key::Right, ModifierKey::NO_MODIFIER)], Action::Right, RIGHT);
-        chords.register(&[ChordKey::Key(Key::Up, ModifierKey::NO_MODIFIER)], Action::Up, UP);
-        chords.register(&[ChordKey::Key(Key::Down, ModifierKey::NO_MODIFIER)], Action::Down, DOWN);
+        chords.register(&[ChordKey::Key(Key::Return, ModifierKey::NO_MODIFIER)], Command::NewLine, NEW_LINE);
+        chords.register(&[ChordKey::Key(Key::Backspace, ModifierKey::NO_MODIFIER)], Command::Backspace, BACKSPACE);
+        chords.register(&[ChordKey::Key(Key::Left, ModifierKey::NO_MODIFIER)], Command::Left, LEFT);
+        chords.register(&[ChordKey::Key(Key::Right, ModifierKey::NO_MODIFIER)], Command::Right, RIGHT);
+        chords.register(&[ChordKey::Key(Key::Up, ModifierKey::NO_MODIFIER)], Command::Up, UP);
+        chords.register(&[ChordKey::Key(Key::Down, ModifierKey::NO_MODIFIER)], Command::Down, DOWN);
         chords.register(&[
             ChordKey::Character('x', ModifierKey::CTRL),
             ChordKey::Character('c', ModifierKey::CTRL),
-        ], Action::Quit, QUIT);
+        ], Command::Quit, QUIT);
 
         Commands {
             chords: chords,
         }
     }
 
-    fn get_action_for_key<'a>(&'a mut self, key: Key, modifiers: ModifierKey) -> Option<ChordResult<Action>> {
+    fn get_action_for_key<'a>(&'a mut self, key: Key, modifiers: ModifierKey) -> Option<ChordResult<Command>> {
         match key {
             Key::LCtrl => None,
             Key::RCtrl => None,
@@ -61,11 +67,11 @@ impl Commands {
         }
     }
 
-    fn get_action_for_char<'a>(&'a mut self, c: char, modifiers: ModifierKey) -> Option<ChordResult<Action>> {
+    fn get_action_for_char<'a>(&'a mut self, c: char, modifiers: ModifierKey) -> Option<ChordResult<Command>> {
         self.chords.perform(ChordKey::Character(c, modifiers))
     }
 
-    pub fn key_event<'a>(&'a mut self, state: InputEventType, key: InputEventKey) -> Option<ChordResult<Action>> {
+    pub fn key_event<'a>(&'a mut self, state: InputEventType, key: InputEventKey) -> Option<ChordResult<Command>> {
         if state == InputEventType::KeyUp {
             return None
         }
