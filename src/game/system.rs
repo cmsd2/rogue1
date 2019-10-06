@@ -29,6 +29,7 @@ pub enum GameActionType {
     Stop,
     MoveAttack(i32, i32),
     Look(i32, i32),
+    Play,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -156,6 +157,10 @@ impl<'a> System<'a> for GameSystem {
                             .path(&actor_pos, &cursor_pos)
                             .map(|(path, _)| path);
                         app.look_mode(cursor_pos, cursor_path);
+                        TurnStatus::Continue
+                    },
+                    GameActionType::Play => {
+                        app.play_mode();
                         TurnStatus::Continue
                     }
                 };

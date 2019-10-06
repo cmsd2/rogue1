@@ -3,13 +3,12 @@ use super::events::Time;
 use super::system::{
     GameAction, GameActionQueue, GameActionType, GameActor, GameEvent, GameEventQueue,
 };
-use crate::chords::ChordResult;
+use crate::chords::{ChordKey, ChordResult};
 use crate::commands::{Command, Commands};
 use crate::glfw_system::RenderContext;
 use crate::input::{InputEventKey, InputEventType};
 use crate::ui::scene::Scene;
 use piston::input::keyboard::ModifierKey;
-use piston::input::Key;
 use slog::Logger;
 use std::sync::Arc;
 use tui::backend::Backend;
@@ -40,7 +39,7 @@ pub struct App {
 impl App {
     pub fn new(log: Arc<Logger>) -> Self {
         let title = format!("rogue1");
-        App {
+        let mut app = App {
             title: title.clone(),
             commands: Commands::default(),
             stop: false,
@@ -57,7 +56,10 @@ impl App {
             time: Time::default(),
             cursor: None,
             log: log,
-        }
+        };
+
+        app.play_mode();
+        app
     }
 
     pub fn end_turn(&mut self, actor: GameActor) {
@@ -145,22 +147,12 @@ impl App {
             cursor: Some(cursor),
             path: path,
         };
+        self.commands.reset();
+        self.commands.register(&[ChordKey::Character('x', ModifierKey::NO_MODIFIER)], Command::Key('x'), "exit-look-mode");
     }
 
-    pub fn look_key_event(&mut self, state: InputEventType, key: InputEventKey) {
-        match (state, key) {
-            (
-                InputEventType::KeyDown,
-                InputEventKey::KeyboardKey {
-                    modifiers: ModifierKey::NO_MODIFIER,
-                    key: Key::X,
-                    ..
-                },
-            ) => {
-                self.play_mode();
-            }
-            _ => {}
-        }
+    pub fn look_key_event(&mut self, _state: InputEventType, _key: InputEventKey) {
+        //println!("[{:?}] unhandled key {:?} {:?}", self.time, state, key);
     }
 
     pub fn look_command(&mut self, command: Command) {
@@ -171,7 +163,10 @@ impl App {
         match (command, self.turn) {
             (Command::Quit, _) => {
                 self.finish();
-            }
+            },
+            (Command::Key('x'), Some(actor @ GameActor::Player(_))) => {
+                self.action(actor, GameActionType::Play);
+            },
             (Command::Up, Some(actor @ GameActor::Player(_))) => {
                 self.action(actor, GameActionType::Look(0, -1));
             }
@@ -196,23 +191,11 @@ impl App {
             cursor: None,
             path: None,
         };
+        self.commands.reset();
+        self.commands.register(&[ChordKey::Character('x', ModifierKey::NO_MODIFIER)], Command::Key('x'), "look-mode");
     }
 
-    pub fn play_key_event(&mut self, state: InputEventType, key: InputEventKey) {
-        match (state, key, self.turn) {
-            (
-                InputEventType::KeyDown,
-                InputEventKey::KeyboardKey {
-                    modifiers: ModifierKey::NO_MODIFIER,
-                    key: Key::X,
-                    ..
-                },
-                Some(actor @ GameActor::Player(_)),
-            ) => {
-                self.action(actor, GameActionType::Look(0, 0));
-            }
-            _ => {}
-        }
+    pub fn play_key_event(&mut self, _state: InputEventType, _key: InputEventKey) {
     }
 
     pub fn play_command(&mut self, command: Command) {
@@ -223,7 +206,10 @@ impl App {
         match (command, self.turn) {
             (Command::Quit, _) => {
                 self.finish();
-            }
+            },
+            (Command::Key('x'), Some(actor @ GameActor::Player(_))) => {
+                self.action(actor, GameActionType::Look(0, 0));
+            },
             (Command::Up, Some(actor @ GameActor::Player(_))) => {
                 self.action(actor, GameActionType::MoveAttack(0, -1));
             }

@@ -21,10 +21,12 @@ pub enum Command {
     Up,
     Down,
     Quit,
+    Key(char),
 }
 
 pub struct Commands {
     pub chords: Chords<Command>,
+    pub stack: Vec<Chords<Command>>,
 }
 
 impl Default for Commands {
@@ -50,6 +52,29 @@ impl Commands {
 
         Commands {
             chords: chords,
+            stack: vec![],
+        }
+    }
+
+    pub fn register(&mut self, keys: &[ChordKey], command: Command, name: &'static str) {
+        self.chords.register(keys, command, name);
+    }
+
+    pub fn reset(&mut self) {
+        self.pop();
+        self.push();
+    }
+
+    pub fn push(&mut self) {
+        self.chords.clear_chord();
+        self.stack.push(self.chords.clone());
+    }
+
+    pub fn pop(&mut self) {
+        if let Some(chords) = self.stack.pop() {
+            self.chords = chords;
+        } else {
+            *self = Self::new();
         }
     }
 

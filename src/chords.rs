@@ -85,7 +85,7 @@ impl <A> ChordAction<A> where A: Debug {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Chords<A> where A: Copy + cmp::Ord + Debug {
     chords: ChordTree<A>,
     keys: Vec<ChordKey>,
