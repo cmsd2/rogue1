@@ -1,7 +1,7 @@
 use specs::{Entities, Entity, ReadStorage};
-use crate::app::App;
-use crate::game::{GameActor, GameActionType};
-use crate::ecs::{Attributes, Position, Liquid};
+use crate::game::app::App;
+use crate::game::system::{GameActor, GameActionType};
+use crate::game::ecs::{Attributes, Position, Liquid};
 
 pub mod system;
 pub mod state;

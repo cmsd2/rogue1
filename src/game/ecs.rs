@@ -3,7 +3,7 @@ use specs::{Join, Entity, Component, Read, ReadStorage, System, WriteStorage, Ve
 use specs::hibitset::BitSetLike;
 use std::time::Duration;
 use std::collections::BTreeMap;
-use crate::level::{Level};
+use super::level::{Level};
 
 pub struct Index<T> {
     blocked: BTreeMap<Position, T>,
@@ -98,7 +98,7 @@ impl Component for Fighter {
 #[derive(Default)]
 pub struct DeltaTime(Duration);
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
@@ -122,6 +122,17 @@ impl Position {
             dx: other.x - self.x,
             dy: other.y - self.y,
         }
+    }
+
+    pub fn distance(&self, other: &Position) -> u32 {
+        use pathfinding::prelude::absdiff;
+        (absdiff(self.x, other.x) + absdiff(self.y, other.y)) as u32
+    }
+
+    pub fn neighbours(&self) -> Vec<Position> {
+        vec![self.delta(-1,-1), self.delta(0,-1), self.delta(1,-1),
+             self.delta(-1,0), self.delta(1,0),
+             self.delta(-1,1), self.delta(0,1), self.delta(1,1)]
     }
 }
 

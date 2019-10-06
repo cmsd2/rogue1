@@ -1,10 +1,10 @@
 use tui::widgets::Widget;
 use tui::buffer::{Buffer, Cell};
 use tui::layout::Rect;
-use tui::style::Style;
+use tui::style::{Style, Color};
 use specs::{Entities, ReadStorage};
-use crate::level::{Level, Cell as LevelCell};
-use crate::ecs::{Character, Position};
+use crate::game::level::{Level, Cell as LevelCell};
+use crate::game::ecs::{Character, Position};
 
 pub struct LevelView<'a> {
     pub area: Rect,
@@ -33,10 +33,10 @@ impl <'a> LevelView<'a> {
     fn draw_cell(&self, cell: &mut Cell, level_cell: &LevelCell) {
         if let Some(entity) = level_cell.entities.get(0) {
             cell.set_symbol(&entity.character.to_string());
-            cell.set_style(Style::default().fg(entity.color));
+            cell.set_style(Style::default().fg(entity.color).bg(Color::Black));
         } else {
             cell.set_symbol(&format!("{}", level_cell));
-            cell.set_style(Style::default().fg(level_cell.color));
+            cell.set_style(Style::default().fg(level_cell.color).bg(Color::Black));
         }
     }
 }

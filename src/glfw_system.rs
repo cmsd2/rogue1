@@ -13,11 +13,11 @@ use std::path::Path;
 use tui::Terminal;
 use tui::backend::TestBackend;
 use tui::layout::Rect;
-use crate::app::App;
+use crate::game::app::App;
+use crate::game::level::Level;
+use crate::game::ecs::{Character, Position, PlayerController};
 use crate::input::{InputHandler};
 use crate::color::ColorMap;
-use crate::level::Level;
-use crate::ecs::{Character, Position, PlayerController};
 
 pub struct RenderContext<'a,'b> {
     pub level: &'a mut Level,
@@ -99,7 +99,7 @@ impl GlfwSystem {
     fn paint_windows<'a,'b>(&mut self, app: &mut Write<'b, App>, render_context: RenderContext<'a,'b>) {
         self.terminal.draw(|mut frame| {
             let size = frame.size();
-            app.scene.render(&mut frame, size, render_context);
+            app.render(&mut frame, size, render_context);
         }).expect("render");
     }
     
@@ -121,6 +121,12 @@ impl GlfwSystem {
                 for j in 0..size.height {
                     let cell = buffer.get(i, j);
                     let color = color_map.lookup_tui(cell.style.fg);
+                    let bgcolor = color_map.lookup_tui(cell.style.bg);
+
+                    let transform = ctx.transform.trans(i as f64 * cell_size.width, j as f64 * cell_size.height);
+
+                    graphics::rectangle(bgcolor, [0.0, 0.0, cell_size.width, cell_size.height], transform, gl);
+
                     let transform = ctx.transform.trans(i as f64 * cell_size.width, (j + 1) as f64 * cell_size.height);
 
                     s.clear();

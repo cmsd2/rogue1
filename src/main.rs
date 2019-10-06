@@ -10,28 +10,23 @@ pub mod charmap;
 pub mod chords;
 pub mod euclid;
 pub mod commands;
-pub mod app;
 pub mod ai;
 pub mod glfw_system;
 pub mod color;
-pub mod scene;
-pub mod pane;
-pub mod level;
-pub mod level_gen;
-pub mod ecs;
-pub mod features;
-pub mod level_view;
-pub mod events;
 pub mod game;
+pub mod ui;
 
 use commands::{Commands};
-use app::App;
 use glfw_system::GlfwSystem;
 use ai::system::AiSystem;
 use ai::Ai;
 use input::InputHandler;
-use game::{GameActor, GameSystem, GameEventQueue};
-use events::Time;
+use game::system::{GameActor, GameSystem, GameEventQueue};
+use game::app::App;
+use game::events::Time;
+use game::level_gen;
+use game::ecs;
+use game::level;
 
 pub struct Scaler {
     pub scale_x: f64,

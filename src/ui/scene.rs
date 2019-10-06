@@ -2,17 +2,24 @@ use tui::{Frame};
 use tui::layout::Rect;
 use tui::backend::Backend;
 use tui::widgets::{Widget, Block, Borders};
-use crate::level_view::LevelView;
+use crate::ui::level_view::LevelView;
+use crate::ui::cursor::Cursor;
+use crate::ui::path::Path;
 use crate::glfw_system::RenderContext;
+use crate::ecs::Position;
 
 pub enum Scene {
     Blank,
-    Text(String),
+    Text {
+        title: String,
+        cursor: Option<Position>,
+        path: Option<Vec<Position>>,
+    }
 }
 
 impl Default for Scene {
     fn default() -> Self {
-        Scene::Text("hello, world!".to_string())
+        Scene::Blank
     }
 }
 
@@ -25,9 +32,9 @@ impl Scene {
                     .borders(Borders::ALL)
                     .render(f, size);
             },
-            Scene::Text(_s) => {
+            Scene::Text { title, cursor, path } => {
                 Block::default()
-                    .title("Text")
+                    .title(title)
                     .borders(Borders::ALL)
                     .render(f, size);
 
@@ -35,6 +42,16 @@ impl Scene {
                 let mut p = LevelView::new(render_context.level, render_context.entities, render_context.characters, render_context.positions)
                     .size(inner);
                 p.render(f, inner);
+
+                if let Some(position) = cursor {
+                    Cursor::new(position.to_owned())
+                        .render(f, inner);
+                }
+
+                if let Some(path) = path {
+                    Path::new(path)
+                        .render(f, inner);
+                }
             }
         }
     }

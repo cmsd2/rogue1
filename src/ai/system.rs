@@ -2,10 +2,10 @@ extern crate utility_programming as up;
 
 use specs::{Entities, System, ReadStorage, Write};
 use up::{/*Generator, Modifier, ModifyOptimizer,*/ Utility};
-use crate::ecs::{Attributes, Position, Liquid};
-use crate::app::App;
 use crate::ai::Ai;
-use crate::game::GameActor;
+use crate::game::ecs::{Attributes, Position, Liquid};
+use crate::game::app::App;
+use crate::game::system::GameActor;
 
 pub struct AiSystem;
 

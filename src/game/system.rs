@@ -1,8 +1,9 @@
 use specs::{Entities, Entity, System, Write, ReadStorage, WriteStorage};
-use crate::events::*;
-use crate::app::App;
-use crate::level::{CellType, Level};
-use crate::ecs::*;
+use super::events::*;
+use super::app::App;
+use super::level::{CellType, Level};
+use super::ecs::*;
+use super::path::PathFinder;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlayerAction {
@@ -24,12 +25,22 @@ pub enum GameActionType {
     Pass,
     Stop,
     MoveAttack(i32, i32),
+    Look(i32, i32),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum GameActor {
     Player(Entity),
     NonPlayer(Entity),
+}
+
+impl GameActor {
+    pub fn entity(&self) -> Entity {
+        match *self {
+            GameActor::Player(entity) => entity,
+            GameActor::NonPlayer(entity) => entity,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -72,6 +83,18 @@ impl <'a> System<'a> for GameSystem {
                 GameActionType::MoveAttack(x, y) => {
                     self.move_or_attack(actor, x, y, &mut app, &entities, &mut level, &mut positions, &characters)
                 },
+                GameActionType::Look(x, y) => {
+                    let path_finder = PathFinder::new(&level);
+                    let actor_pos = positions.get(actor.entity()).unwrap().clone();
+                    let cursor_pos = if let Some(cursor) = app.cursor.clone() {
+                        cursor.delta(x, y)
+                    } else {
+                        actor_pos.clone()
+                    };
+                    let cursor_path = path_finder.path(&actor_pos, &cursor_pos).map(|(path,_)| path);
+                    app.look_mode(cursor_pos, cursor_path);
+                    TurnStatus::Continue
+                }
             };
 
             match turn_status {

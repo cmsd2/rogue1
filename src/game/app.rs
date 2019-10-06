@@ -1,16 +1,25 @@
+use piston::input::Key;
+use piston::input::keyboard::ModifierKey;
+use tui::{Frame};
+use tui::layout::Rect;
+use tui::backend::Backend;
 use crate::commands::{Command, Commands};
-use crate::scene::Scene;
-use crate::events::Time;
-use crate::game::{GameActor, GameEventQueue, GameActionQueue, GameAction, GameActionType, GameEvent};
+use crate::ui::scene::Scene;
 use crate::input::{InputEventType, InputEventKey};
 use crate::chords::ChordResult;
+use crate::glfw_system::RenderContext;
+use super::events::Time;
+use super::system::{GameActor, GameEventQueue, GameActionQueue, GameAction, GameActionType, GameEvent};
+use super::ecs::Position;
 
 pub enum InputMode {
     Edit,
-    View,
+    Play,
+    Look,
 }
 
 pub struct App {
+    pub title: String,
     pub commands: Commands,
     pub stop: bool,
     pub player_turns: u32,
@@ -20,6 +29,7 @@ pub struct App {
     pub action_queue: GameActionQueue,
     pub input_mode: InputMode,
     pub time: Time,
+    pub cursor: Option<Position>,
 }
 
 impl Default for App {
@@ -30,16 +40,19 @@ impl Default for App {
 
 impl App {
     pub fn new() -> Self {
+        let title = format!("rogue1");
         App {
+            title: title.clone(),
             commands: Commands::default(),
             stop: false,
             player_turns: 0,
             turn: None,
-            scene: Scene::default(),
+            scene: Scene::Text { title, cursor: None, path: None },
             event_queue: GameEventQueue::default(),
             action_queue: GameActionQueue::default(),
-            input_mode: InputMode::View,
+            input_mode: InputMode::Play,
             time: Time::default(),
+            cursor: None,
         }
     }
 
@@ -86,10 +99,24 @@ impl App {
 
     pub fn key_event(&mut self, state: InputEventType, key: InputEventKey) {
         match self.input_mode {
-            InputMode::View => {
+            InputMode::Play => {
                 match self.commands.key_event(state, key) {
                     Some(ChordResult::Action(command)) => {
-                        self.command(command);
+                        self.play_command(command);
+                    },
+                    None => {
+                        self.play_key_event(state, key);
+                    },
+                    _ => {}
+                }
+            },
+            InputMode::Look => {
+                match self.commands.key_event(state, key) {
+                    Some(ChordResult::Action(command)) => {
+                        self.look_command(command);
+                    },
+                    None => {
+                        self.look_key_event(state, key);
                     },
                     _ => {}
                 }
@@ -101,8 +128,71 @@ impl App {
         }
     }
 
-    pub fn command(&mut self, command: Command) {
-        println!("[{:?}] command: {:?} player_turn: {:?}", self.time, command, self.turn);
+    pub fn look_mode(&mut self, cursor: Position, path: Option<Vec<Position>>) {
+        println!("[{:?}] look at: {:?}", self.time, cursor);
+        self.input_mode = InputMode::Look;
+        self.cursor = Some(cursor.clone());
+        self.scene = Scene::Text {
+            title: self.title.clone(),
+            cursor: Some(cursor),
+            path: path
+        };
+    }
+
+    pub fn look_key_event(&mut self, state: InputEventType, key: InputEventKey) {
+        match (state, key) {
+            (InputEventType::KeyDown, InputEventKey::KeyboardKey { modifiers: ModifierKey::NO_MODIFIER, key: Key::X, .. }) => {
+                self.play_mode();
+            },
+            _ => {}
+        }
+    }
+
+    pub fn look_command(&mut self, command: Command) {
+        println!("[{:?}] look command: {:?} player_turn: {:?}", self.time, command, self.turn);
+        match (command, self.turn) {
+            (Command::Quit, _) => {
+                self.finish();
+            },
+            (Command::Up, Some(actor @ GameActor::Player(_))) => {
+                self.action(actor, GameActionType::Look(0, -1));
+            },
+            (Command::Down, Some(actor @ GameActor::Player(_))) => {
+                self.action(actor, GameActionType::Look(0, 1));
+            },
+            (Command::Left, Some(actor @ GameActor::Player(_))) => {
+                self.action(actor, GameActionType::Look(-1, 0));
+            },
+            (Command::Right, Some(actor @ GameActor::Player(_))) => {
+                self.action(actor, GameActionType::Look(1, 0));
+            },
+            _ => {}
+        }
+    }
+
+    pub fn play_mode(&mut self) {
+        self.input_mode = InputMode::Play;
+        self.cursor = None;
+        self.scene = Scene::Text {
+            title: self.title.clone(),
+            cursor: None,
+            path: None
+        };
+    }
+
+    pub fn play_key_event(&mut self, state: InputEventType, key: InputEventKey) {
+        match (state, key, self.turn) {
+            (InputEventType::KeyDown,
+             InputEventKey::KeyboardKey { modifiers: ModifierKey::NO_MODIFIER, key: Key::X, .. },
+             Some(actor @ GameActor::Player(_))) => {
+                self.action(actor, GameActionType::Look(0, 0));
+            },
+            _ => {}
+        }
+    }
+
+    pub fn play_command(&mut self, command: Command) {
+        println!("[{:?}] play command: {:?} player_turn: {:?}", self.time, command, self.turn);
         match (command, self.turn) {
             (Command::Quit, _) => {
                 self.finish();
@@ -159,5 +249,9 @@ impl App {
         } else {
             None
         }
+    }
+
+    pub fn render<'a, 'b, B>(&mut self, f: &mut Frame<B>, size: Rect, render_context: RenderContext<'a,'b>) where B: Backend {
+        self.scene.render(f, size, render_context);
     }
 }
