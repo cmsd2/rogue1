@@ -6,6 +6,7 @@ use tui::style::Color;
 use crate::level::{self, Cell, CellType, Level};
 use crate::color::ColorMap;
 use crate::ecs::{AiController, Attributes, Character, Position, EntityIndex, Fighter, PlayerController};
+use crate::game::fov::Fov;
 
 const ROOM_MAX_SIZE: u16 = 10;
 const ROOM_MIN_SIZE: u16 = 6;
@@ -270,12 +271,16 @@ fn place_objects(room: Rect, _color_map: &ColorMap, level_map: &mut Level, world
     }
 }
 
-pub fn create_player(level: &mut Level, world: &mut World) -> Entity {
+pub fn create_player(level: &mut Level, fov: &mut Fov, world: &mut World) -> Entity {
+    let vision_radius = 20;
     let (x, y) = level.start();
+    let start = Position { x: x as i32, y: y as i32 };
+
+    fov.compute(level, &start, vision_radius);
 
     let e = world
         .create_entity()
-        .with(Position { x: x as i32, y: y as i32 })
+        .with(start)
         .with(Character { glyph: '@', color: Color::White })
         .with(PlayerController {})
         .with(Attributes {
@@ -284,6 +289,7 @@ pub fn create_player(level: &mut Level, world: &mut World) -> Entity {
             alive: true,
             max_hp: 30,
             hp: 30,
+            vision_radius: vision_radius,
             ..Default::default()
         })
         .with(Fighter {

@@ -39,8 +39,8 @@ impl Scene {
                     .render(f, size);
 
                 let inner = size.inner(1);
-                let mut p = LevelView::new(render_context.level, render_context.entities, render_context.characters, render_context.positions)
-                    .size(inner);
+                let mut p = LevelView::new(render_context.level, render_context.fov, render_context.entities, render_context.characters, render_context.positions)
+                    .level_area(render_context.level.area().clone());
                 p.render(f, inner);
 
                 if let Some(position) = cursor {

@@ -299,6 +299,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "doryen-fov"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "draw_state"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -444,6 +449,7 @@ name = "hello-piston"
 version = "0.1.0"
 dependencies = [
  "advancedresearch-utility_programming 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "doryen-fov 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "gfx 0.18.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "pathfinding 1.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "piston 0.49.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1378,6 +1384,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum deflate 0.7.20 (registry+https://github.com/rust-lang/crates.io-index)" = "707b6a7b384888a70c8d2e8650b3e60170dfc6a67bb4aa67b6dfca57af4bedb4"
 "checksum derivative 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "942ca430eef7a3806595a6737bc388bf51adb888d3fc0dd1b50f1c170167ee3a"
 "checksum dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3fd78930633bd1c6e35c4b42b1df7b0cbc6bc191146e512bb3bedf243fcc3901"
+"checksum doryen-fov 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2a8e6ef8177b52d581c728655ff05fe03a6634ed496fc2c6642bb17b91d27aa9"
 "checksum draw_state 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "33cf9537e2d06891448799b96d5a8c8083e0e90522a7fdabe6ebf4f41d79d651"
 "checksum either 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "5527cfe0d098f36e3f8839852688e63c8fff1c90b2b405aef730615f9a7bcf7b"
 "checksum failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "795bd83d3abeb9220f257e597aa0080a508b27533824adf336529648f6abf7e2"

@@ -1,6 +1,7 @@
 use super::app::App;
 use super::ecs::*;
 use super::events::*;
+use super::fov::Fov;
 use super::level::{CellType, Level};
 use super::path::PathFinder;
 use crate::ai::Ai;
@@ -85,6 +86,7 @@ impl<'a> System<'a> for GameSystem {
         Write<'a, Ai>,
         Entities<'a>,
         Write<'a, Level>,
+        WriteExpect<'a, Fov>,
         WriteStorage<'a, Position>,
         ReadStorage<'a, Character>,
         ReadStorage<'a, Attributes>,
@@ -93,7 +95,7 @@ impl<'a> System<'a> for GameSystem {
 
     fn run(
         &mut self,
-        (mut app, mut ai, entities, mut level, mut positions, characters, attributes, liquids): Self::SystemData,
+        (mut app, mut ai, entities, mut level, mut fov, mut positions, characters, attributes, liquids): Self::SystemData,
     ) {
         //use specs::Join;
 
@@ -142,8 +144,10 @@ impl<'a> System<'a> for GameSystem {
                         &mut app,
                         &entities,
                         &mut level,
+                        &mut fov,
                         &mut positions,
                         &characters,
+                        &attributes,
                     ),
                     GameActionType::Look(x, y) => {
                         let path_finder = PathFinder::new(&level);
@@ -212,8 +216,10 @@ impl GameSystem {
         app: &mut WriteExpect<'a, App>,
         _entities: &Entities<'a>,
         level: &mut Write<'a, Level>,
+        fov: &mut WriteExpect<'a, Fov>,
         positions: &mut WriteStorage<'a, Position>,
         _characters: &ReadStorage<'a, Character>,
+        attributes: &ReadStorage<'a, Attributes>,
     ) -> TurnStatus {
         //use specs::Join;
 
@@ -227,10 +233,14 @@ impl GameSystem {
             x: pos.x + x,
             y: pos.y + y,
         };
+        let attrs = attributes.get(entity).unwrap();
 
         match Collider::new(level).get(&new_pos) {
             Occupier::Empty => {
                 EntityMover::new(level).move_entity(entity, &mut pos, x, y);
+                if actor.is_player() {
+                    fov.compute(level, &new_pos, attrs.vision_radius);
+                }
                 TurnStatus::EndTurn(Time::default() + 1)
             }
             Occupier::Wall => {

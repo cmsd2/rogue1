@@ -23,6 +23,7 @@ slog = "2.5.2"
 slog-term = "2.4.1"
 slog-async = "2.3.0"
 slog-envlogger = "2.2.0"
+doryen-fov = "0.1.1"
 
 [dependencies.tui]
 version = "*"

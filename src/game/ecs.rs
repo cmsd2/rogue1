@@ -70,6 +70,7 @@ pub struct Attributes {
     pub thirst: f32,
     pub max_hp: i32,
     pub hp: i32,
+    pub vision_radius: u16,
 }
 
 impl Component for Attributes {
@@ -109,6 +110,13 @@ impl Component for Position {
 }
 
 impl Position {
+    pub fn new(x: i32, y: i32) -> Position {
+        Position {
+            x: x,
+            y: y,
+        }
+    }
+
     pub fn delta(&self, dx: i32, dy: i32) -> Position {
         Position {
             x: self.x + dx,

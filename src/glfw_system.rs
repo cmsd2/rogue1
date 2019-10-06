@@ -2,6 +2,7 @@ use crate::color::ColorMap;
 use crate::game::app::App;
 use crate::game::ecs::{Character, PlayerController, Position};
 use crate::game::level::Level;
+use crate::game::fov::Fov;
 use crate::input::InputHandler;
 use glfw_window::GlfwWindow;
 use graphics::character::CharacterCache;
@@ -12,7 +13,7 @@ use piston::event_loop::*;
 use piston::Window as PistonWindow;
 use piston::{RenderArgs, RenderEvent, UpdateArgs, UpdateEvent};
 use slog::Logger;
-use specs::{Entities, ReadStorage, System, Write, WriteExpect};
+use specs::{Entities, ReadExpect, ReadStorage, System, Write, WriteExpect};
 use std::cell::RefCell;
 use std::path::Path;
 use std::rc::Rc;
@@ -24,6 +25,7 @@ use tui::Terminal;
 
 pub struct RenderContext<'a, 'b> {
     pub level: &'a mut Level,
+    pub fov: &'a ReadExpect<'b, Fov>,
     pub entities: &'a Entities<'b>,
     pub characters: &'a ReadStorage<'b, Character>,
     pub positions: &'a ReadStorage<'b, Position>,
@@ -49,7 +51,6 @@ impl GlfwSystem {
         gl: GlGraphics,
         font: &Path,
         font_size: FontSize,
-        color: [f32; 4],
     ) -> Self {
         let mut system = GlfwSystem {
             log: log,
@@ -61,7 +62,7 @@ impl GlfwSystem {
             font_size: font_size,
             events: Events::new(EventSettings::new()),
             terminal: Terminal::new(TestBackend::new(1, 1)).expect("terminal"),
-            color_map: Rc::new(ColorMap { default_fg: color }),
+            color_map: Rc::new(ColorMap::default()),
             cell_size: piston::Size {
                 width: 0.0,
                 height: 0.0,
@@ -151,9 +152,9 @@ impl GlfwSystem {
             for i in 0..size.width {
                 for j in 0..size.height {
                     let cell = buffer.get(i, j);
-                    let color = color_map.lookup_tui(cell.style.fg);
+                    let color = color_map.lookup_tui(cell.style.fg, cell.style.bg, cell.style.modifier);
                     if cell.style.bg != Color::Black {
-                        let bgcolor = color_map.lookup_tui(cell.style.bg);
+                        let bgcolor = color_map.lookup_tui(cell.style.bg, Color::Black, cell.style.modifier);
                         let transform = ctx
                             .transform
                             .trans(i as f64 * cell_size.width, j as f64 * cell_size.height);
@@ -189,6 +190,7 @@ impl<'a> System<'a> for GlfwSystem {
     type SystemData = (
         Entities<'a>,
         Write<'a, Level>,
+        ReadExpect<'a, Fov>,
         WriteExpect<'a, App>,
         Write<'a, InputHandler>,
         ReadStorage<'a, Character>,
@@ -201,6 +203,7 @@ impl<'a> System<'a> for GlfwSystem {
         (
             entities,
             mut level,
+            fov,
             mut app,
             mut input_handler,
             characters,
@@ -216,6 +219,7 @@ impl<'a> System<'a> for GlfwSystem {
             if let Some(r) = e.render_args() {
                 let render_context = RenderContext {
                     level: &mut level,
+                    fov: &fov,
                     entities: &entities,
                     characters: &characters,
                     positions: &positions,

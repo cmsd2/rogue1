@@ -25,6 +25,7 @@ use commands::Commands;
 use game::app::App;
 use game::ecs;
 use game::events::Time;
+use game::fov::Fov;
 use game::level;
 use game::level_gen;
 use game::system::{GameActor, GameEventQueue, GameSystem};
@@ -98,7 +99,6 @@ fn main() {
             GlGraphics::new(opengl),
             Path::new("UbuntuMono-R.ttf"),
             32,
-            [1.0, 0.0, 0.0, 1.0],
         ))
         .build();
     world.register::<ecs::Position>();
@@ -117,12 +117,14 @@ fn main() {
     let mut app = App::new(log.clone());
     let mut level = level::Level::empty(tui::layout::Rect::new(0, 0, 80, 25));
     let entities = level_gen::make_map(&color::ColorMap::default(), &mut level, &mut world);
-    let player_entity = level_gen::create_player(&mut level, &mut world);
+    let mut fov = Fov::new(&level);
+    let player_entity = level_gen::create_player(&mut level, &mut fov, &mut world);
     app.schedule_turn(Time::default(), GameActor::Player(player_entity));
     for entity in entities {
         app.schedule_turn(Time::default(), GameActor::NonPlayer(entity));
     }
 
+    world.insert(fov);
     world.insert(level);
     world.insert(app);
     world.insert(Ai::default());
