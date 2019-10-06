@@ -1,25 +1,28 @@
-use specs::{Entities, System, Write, ReadStorage};
-use piston;
-use piston::Window as PistonWindow;
+use crate::color::ColorMap;
+use crate::game::app::App;
+use crate::game::ecs::{Character, PlayerController, Position};
+use crate::game::level::Level;
+use crate::input::InputHandler;
 use glfw_window::GlfwWindow;
-use piston::event_loop::*;
-use piston::{RenderArgs, RenderEvent, UpdateArgs, UpdateEvent};
 use graphics::character::CharacterCache;
-use graphics::types::{FontSize};
-use opengl_graphics::{ GlGraphics, GlyphCache, TextureSettings };
-use std::rc::Rc;
-use std::cell::{RefCell};
+use graphics::types::FontSize;
+use opengl_graphics::{GlGraphics, GlyphCache, TextureSettings};
+use piston;
+use piston::event_loop::*;
+use piston::Window as PistonWindow;
+use piston::{RenderArgs, RenderEvent, UpdateArgs, UpdateEvent};
+use slog::Logger;
+use specs::{Entities, ReadStorage, System, Write, WriteExpect};
+use std::cell::RefCell;
 use std::path::Path;
-use tui::Terminal;
+use std::rc::Rc;
+use std::sync::Arc;
 use tui::backend::TestBackend;
 use tui::layout::Rect;
-use crate::game::app::App;
-use crate::game::level::Level;
-use crate::game::ecs::{Character, Position, PlayerController};
-use crate::input::{InputHandler};
-use crate::color::ColorMap;
+use tui::style::Color;
+use tui::Terminal;
 
-pub struct RenderContext<'a,'b> {
+pub struct RenderContext<'a, 'b> {
     pub level: &'a mut Level,
     pub entities: &'a Entities<'b>,
     pub characters: &'a ReadStorage<'b, Character>,
@@ -36,20 +39,33 @@ pub struct GlfwSystem {
     color_map: Rc<ColorMap>,
     cell_size: piston::Size,
     known_size: Option<piston::Size>,
+    log: Arc<Logger>,
 }
 
 impl GlfwSystem {
-    pub fn new(window: GlfwWindow, gl: GlGraphics, font: &Path, font_size: FontSize, color: [f32; 4]) -> Self {
-
+    pub fn new(
+        log: Arc<Logger>,
+        window: GlfwWindow,
+        gl: GlGraphics,
+        font: &Path,
+        font_size: FontSize,
+        color: [f32; 4],
+    ) -> Self {
         let mut system = GlfwSystem {
+            log: log,
             window: window,
             gl: gl,
-            glyphs: Rc::new(RefCell::new(GlyphCache::new(font, (), TextureSettings::new()).unwrap())),
+            glyphs: Rc::new(RefCell::new(
+                GlyphCache::new(font, (), TextureSettings::new()).unwrap(),
+            )),
             font_size: font_size,
             events: Events::new(EventSettings::new()),
-            terminal: Terminal::new(TestBackend::new(1,1)).expect("terminal"),
+            terminal: Terminal::new(TestBackend::new(1, 1)).expect("terminal"),
             color_map: Rc::new(ColorMap { default_fg: color }),
-            cell_size: piston::Size { width: 0.0, height: 0.0 },
+            cell_size: piston::Size {
+                width: 0.0,
+                height: 0.0,
+            },
             known_size: None,
         };
 
@@ -63,13 +79,23 @@ impl GlfwSystem {
 
         if Some(size) != self.known_size {
             self.cell_size = self.calc_cell_size();
-            let (cols,rows) = self.calc_grid_dimensions(size, self.cell_size);
-            self.terminal.resize(Rect::new(0, 0, cols as u16, rows as u16)).expect("resize");
+            let (cols, rows) = self.calc_grid_dimensions(size, self.cell_size);
+            self.terminal
+                .resize(Rect::new(0, 0, cols as u16, rows as u16))
+                .expect("resize");
             *self.terminal.backend_mut() = TestBackend::new(cols as u16, rows as u16);
 
-            println!("cell size: {} x {}", self.cell_size.width, self.cell_size.height);
-            println!("grid size: {} x {}", cols, rows);
-            println!("term size: {} x {}", self.terminal.size().unwrap().width, self.terminal.size().unwrap().height);
+            debug!(
+                self.log,
+                "cell size: {} x {}", self.cell_size.width, self.cell_size.height
+            );
+            debug!(self.log, "grid size: {} x {}", cols, rows);
+            debug!(
+                self.log,
+                "term size: {} x {}",
+                self.terminal.size().unwrap().width,
+                self.terminal.size().unwrap().height
+            );
 
             self.known_size = Some(size);
         }
@@ -96,13 +122,18 @@ impl GlfwSystem {
         glyphs.width(self.font_size, text).unwrap()
     }
 
-    fn paint_windows<'a,'b>(&mut self, app: &mut Write<'b, App>, render_context: RenderContext<'a,'b>) {
-        self.terminal.draw(|mut frame| {
-            let size = frame.size();
-            app.render(&mut frame, size, render_context);
-        }).expect("render");
+    fn paint_windows<'a, 'b>(
+        &mut self,
+        app: &mut WriteExpect<'b, App>,
+        render_context: RenderContext<'a, 'b>,
+    ) {
+        self.terminal
+            .draw(|mut frame| {
+                let size = frame.size();
+                app.render(&mut frame, size, render_context);
+            })
+            .expect("render");
     }
-    
     fn render(&mut self, args: RenderArgs) {
         use graphics::*;
 
@@ -121,34 +152,62 @@ impl GlfwSystem {
                 for j in 0..size.height {
                     let cell = buffer.get(i, j);
                     let color = color_map.lookup_tui(cell.style.fg);
-                    let bgcolor = color_map.lookup_tui(cell.style.bg);
+                    if cell.style.bg != Color::Black {
+                        let bgcolor = color_map.lookup_tui(cell.style.bg);
+                        let transform = ctx
+                            .transform
+                            .trans(i as f64 * cell_size.width, j as f64 * cell_size.height);
 
-                    let transform = ctx.transform.trans(i as f64 * cell_size.width, j as f64 * cell_size.height);
+                        graphics::rectangle(
+                            bgcolor,
+                            [0.0, 0.0, cell_size.width, cell_size.height],
+                            transform,
+                            gl,
+                        );
+                    }
 
-                    graphics::rectangle(bgcolor, [0.0, 0.0, cell_size.width, cell_size.height], transform, gl);
-
-                    let transform = ctx.transform.trans(i as f64 * cell_size.width, (j + 1) as f64 * cell_size.height);
+                    let transform = ctx.transform.trans(
+                        i as f64 * cell_size.width,
+                        (j + 1) as f64 * cell_size.height,
+                    );
 
                     s.clear();
                     s.push_str(&cell.symbol);
 
                     graphics::text::Text::new_color(color, font_size)
-                            .draw(&s, &mut *glyphs, &ctx.draw_state, transform, gl)
-                            .unwrap();
+                        .draw(&s, &mut *glyphs, &ctx.draw_state, transform, gl)
+                        .unwrap();
                 }
             }
         });
     }
 
-    fn update(&mut self, _args: UpdateArgs) {
-
-    }
+    fn update(&mut self, _args: UpdateArgs) {}
 }
 
-impl <'a> System<'a> for GlfwSystem {
-    type SystemData = (Entities<'a>, Write<'a, Level>, Write<'a, App>, Write<'a, InputHandler>, ReadStorage<'a, Character>, ReadStorage<'a, Position>, ReadStorage<'a, PlayerController>);
+impl<'a> System<'a> for GlfwSystem {
+    type SystemData = (
+        Entities<'a>,
+        Write<'a, Level>,
+        WriteExpect<'a, App>,
+        Write<'a, InputHandler>,
+        ReadStorage<'a, Character>,
+        ReadStorage<'a, Position>,
+        ReadStorage<'a, PlayerController>,
+    );
 
-    fn run(&mut self, (entities, mut level, mut app, mut input_handler, characters, positions, _player_controlled): Self::SystemData) {
+    fn run(
+        &mut self,
+        (
+            entities,
+            mut level,
+            mut app,
+            mut input_handler,
+            characters,
+            positions,
+            _player_controlled,
+        ): Self::SystemData,
+    ) {
         //use specs::Join;
 
         self.resize();
@@ -171,7 +230,7 @@ impl <'a> System<'a> for GlfwSystem {
             }
 
             for kev in input_handler.event(&e) {
-                println!("[{:?}] input: {:?}", app.time, kev);
+                debug!(self.log, "[{:?}] input: {:?}", app.time, kev);
                 app.key_event(kev.state, kev.key);
             }
         } else {

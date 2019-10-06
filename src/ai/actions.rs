@@ -1,36 +1,62 @@
-use std::f32;
+use crate::ecs::{Attributes, Liquid, Position};
 use rgoap::{self, Action, State};
-use specs::{Entities, Entity, ReadStorage};
-use crate::ecs::{Position, Attributes, Liquid};
+use specs::{Entities, Entity, ReadStorage, WriteStorage};
+use std::f32;
 
 pub trait StateBuilder<P> {
-    fn with<S>(self, name: S, value: bool) -> Self where S: Into<P>;
+    fn with<S>(self, name: S, value: bool) -> Self
+    where
+        S: Into<P>;
 }
 
-impl <P> StateBuilder<P> for State<P> where P: Ord {
-    fn with<S>(mut self, name: S, value: bool) -> Self where S: Into<P> {
+impl<P> StateBuilder<P> for State<P>
+where
+    P: Ord,
+{
+    fn with<S>(mut self, name: S, value: bool) -> Self
+    where
+        S: Into<P>,
+    {
         self.insert(name.into(), value);
         self
     }
 }
 
-pub trait ActionBuilder<K,P> {
-    fn build<S>(name: S, cost: usize) -> Self where S: Into<K>;
-    fn pre<S>(self, name: S, value: bool) -> Self where S: Into<P>;
-    fn post<S>(self, name: S, value: bool) -> Self where S: Into<P>;
+pub trait ActionBuilder<K, P> {
+    fn build<S>(name: S, cost: usize) -> Self
+    where
+        S: Into<K>;
+    fn pre<S>(self, name: S, value: bool) -> Self
+    where
+        S: Into<P>;
+    fn post<S>(self, name: S, value: bool) -> Self
+    where
+        S: Into<P>;
 }
 
-impl <K,P> ActionBuilder<K,P> for Action<K,P> where P: Ord {
-    fn build<S>(name: S, cost: usize) -> Self where S: Into<K> {
+impl<K, P> ActionBuilder<K, P> for Action<K, P>
+where
+    P: Ord,
+{
+    fn build<S>(name: S, cost: usize) -> Self
+    where
+        S: Into<K>,
+    {
         Action::new(name, cost)
     }
 
-    fn pre<S>(mut self, name: S, value: bool) -> Self where S: Into<P> {
+    fn pre<S>(mut self, name: S, value: bool) -> Self
+    where
+        S: Into<P>,
+    {
         self.pre_conditions.insert(name.into(), value);
         self
     }
-    
-    fn post<S>(mut self, name: S, value: bool) -> Self where S: Into<P> {
+
+    fn post<S>(mut self, name: S, value: bool) -> Self
+    where
+        S: Into<P>,
+    {
         self.post_conditions.insert(name.into(), value);
         self
     }
@@ -65,7 +91,7 @@ pub struct AiAction {
 pub enum AiActionType {
     Meditate,
     DrinkPotable(Entity),
-    Get(Entity)
+    Get(Entity),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -136,7 +162,13 @@ impl AiActions {
         self.actions.push(action);
     }
 
-    pub fn setup_actions<'a>(&mut self, entities: &Entities<'a>, positions: &ReadStorage<'a, Position>, attributes: &ReadStorage<'a, Attributes>, liquids: &ReadStorage<'a, Liquid>) {
+    pub fn setup_actions<'a>(
+        &mut self,
+        entities: &Entities<'a>,
+        positions: &mut WriteStorage<'a, Position>,
+        attributes: &ReadStorage<'a, Attributes>,
+        liquids: &ReadStorage<'a, Liquid>,
+    ) {
         use specs::Join;
 
         self.add_action(AiAction::meditate(&self.agent));
@@ -166,14 +198,14 @@ impl AiActions {
     }
 
     pub fn plan(&self) -> Option<Vec<AiActionType>> {
-        let possible_actions: Vec<Action<AiActionType,AiPredicate>> = self.actions.iter().map(|a| a.clone().action()).collect();
+        let possible_actions: Vec<Action<AiActionType, AiPredicate>> =
+            self.actions.iter().map(|a| a.clone().action()).collect();
 
         if let Some(ai_action) = self.find_max_utility() {
             let initial_state = State::new();
             let action = ai_action.clone().action();
 
             let planned = rgoap::plan(&initial_state, &action.post_conditions, &possible_actions);
-        
             planned.map(|actions| actions.iter().map(|action| action.name.clone()).collect())
         } else {
             None
