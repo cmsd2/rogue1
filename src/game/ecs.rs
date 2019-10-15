@@ -1,9 +1,10 @@
-use tui::style::Color;
-use specs::{Join, Entity, Component, Read, ReadStorage, System, WriteStorage, VecStorage};
-use specs::hibitset::BitSetLike;
+use specs::{World, WorldExt, Join, Entity, Component, Read, ReadStorage, System, WriteStorage, VecStorage};
+use hibitset::BitSetLike;
 use std::time::Duration;
 use std::collections::BTreeMap;
+use std::cmp;
 use super::level::{Level};
+use crate::color::{Color};
 
 pub struct Index<T> {
     blocked: BTreeMap<Position, T>,
@@ -99,7 +100,117 @@ impl Component for Fighter {
 #[derive(Default)]
 pub struct DeltaTime(Duration);
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
+#[derive(Default, Debug, PartialEq, Clone)]
+pub struct Rect {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+impl Rect {
+    pub fn new(left: i32, top: i32, width: i32, height: i32) -> Rect {
+        Rect {
+            x: left,
+            y: top,
+            width: width,
+            height: height,
+        }
+    }
+
+    pub fn new_sized(width: i32, height: i32) -> Rect {
+        Self::new(0, 0, width, height)
+    }
+
+    pub fn left(&self) -> i32 {
+        self.x
+    }
+
+    pub fn right(&self) -> i32 {
+        self.x + self.width
+    }
+
+    pub fn top(&self) -> i32 {
+        self.y
+    }
+
+    pub fn bottom(&self) -> i32 {
+        self.y + self.height
+    }
+
+    pub fn area(&self) -> i32 {
+        self.width * self.height
+    }
+
+    pub fn top_left(&self) -> Position {
+        Position::new(self.x, self.y)
+    }
+
+    pub fn bottom_right(&self) -> Position {
+        Position::new(self.x + self.width, self.y + self.height)
+    }
+
+    pub fn union(&self, other: &Rect) -> Rect {
+        let left = cmp::min(self.x, other.x);
+        let top = cmp::min(self.y, other.y);
+        let right = cmp::max(self.x, other.x);
+        let bottom = cmp::max(self.y, other.y);
+
+        Rect {
+            x: left,
+            y: top,
+            width: right - left,
+            height: bottom - top,
+        }
+    }
+
+    pub fn center(&self) -> Position {
+        Position::new(
+            self.x + self.width / 2,
+            self.y + self.height / 2,
+        )
+    }
+
+    pub fn inner(&self, horizontal_margin: i32, vertical_margin: i32) -> Rect {
+        let horizontal_margin = cmp::min(horizontal_margin, self.width / 2);
+        let vertical_margin = cmp::min(vertical_margin, self.height / 2);
+
+        let left = self.x + horizontal_margin;
+        let right = self.right() - horizontal_margin;
+        let top = self.y + vertical_margin;
+        let bottom = self.bottom() - vertical_margin;
+
+        Rect {
+            x: left,
+            y: top,
+            width: right - left,
+            height: bottom - top,
+        }
+    }
+
+    pub fn intersection(&self, other: &Rect) -> Rect {
+        let left = cmp::max(self.x, other.x);
+        let top = cmp::max(self.y, other.y);
+        let right = cmp::min(self.right(), other.right());
+        let bottom = cmp::min(self.bottom(), other.bottom());
+
+        Rect {
+            x: left,
+            y: top,
+            width: right - left,
+            height: bottom - top,
+        }
+    }
+
+    pub fn intersects(&self, other: &Rect) -> bool {
+        other.left() < self.right()
+        && other.right() > self.left()
+        && other.top() < self.bottom()
+        && other.bottom() > self.top()
+    }
+}
+
+#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
@@ -301,7 +412,7 @@ impl <'a,T> Collider<'a,T> where T: Clone {
     }
 
     pub fn get(&self, p: &Position) -> Occupier<T> {
-        if self.level_map.get(p.x as u16, p.y as u16).blocked {
+        if self.level_map.get(p.x, p.y).blocked {
             return Occupier::Wall;
         }
         
@@ -311,4 +422,15 @@ impl <'a,T> Collider<'a,T> where T: Clone {
 
         Occupier::Empty
     }
+}
+
+pub fn setup(world: &mut World) {
+    world.register::<Position>();
+    world.register::<Velocity>();
+    world.register::<PlayerController>();
+    world.register::<AiController>();
+    world.register::<Attributes>();
+    world.register::<Liquid>();
+    world.register::<Fighter>();
+    world.register::<Character>();
 }

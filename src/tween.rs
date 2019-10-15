@@ -1,6 +1,7 @@
 use std::ops;
 use std::cmp;
 use std::f32;
+use std::f64;
 
 pub trait MinMax {
     fn min(self, other: Self) -> Self;
@@ -27,12 +28,32 @@ impl MinMax for f32 {
     }
 }
 
+impl MinMax for f64 {
+    fn min(self, other: Self) -> Self {
+        f64::min(self, other)
+    }
+
+    fn max(self, other: Self) -> Self {
+        f64::max(self, other)
+    }
+}
+
 pub trait TweenableValue: Sized + Copy + PartialEq + PartialOrd + MinMax + ops::Add<Output=Self> + ops::Sub<Output=Self> + ops::Mul<Output=Self> + ops::Div<Output=Self> {
     fn signum(self) -> Self;
     fn abs(self) -> Self;
 }
 
 impl TweenableValue for f32 {
+    fn signum(self) -> Self {
+        self.signum()
+    }
+
+    fn abs(self) -> Self {
+        self.abs()
+    }
+}
+
+impl TweenableValue for f64 {
     fn signum(self) -> Self {
         self.signum()
     }
@@ -53,15 +74,16 @@ impl TweenableValue for i32 {
 }
 
 pub trait Tweenable<T> where T: TweenableValue {
-    fn tween(&mut self, t: Tweener<T>);
+    fn tween(&mut self, t: &Tweener<T>);
 }
 
 impl <T> Tweenable<T> for T where T: TweenableValue {
-    fn tween(&mut self, t: Tweener<T>) {
+    fn tween(&mut self, t: &Tweener<T>) {
         *self = t.apply(*self);
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum Tweener<T> where T: TweenableValue {
     Increment {
         to: T,
@@ -121,7 +143,7 @@ mod tests {
         assert_eq!(t.apply(150.0) as i32, 140);
 
         let mut f: f32 = 50.0;
-        f.tween(t);
+        f.tween(&t);
         assert_eq!(f as i32, 60);
     }
 }

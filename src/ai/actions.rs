@@ -1,4 +1,4 @@
-use crate::ecs::{Attributes, Liquid, Position};
+use crate::game::ecs::{Attributes, Liquid, Position};
 use rgoap::{self, Action, State};
 use specs::{Entities, Entity, ReadStorage, WriteStorage};
 use std::f32;

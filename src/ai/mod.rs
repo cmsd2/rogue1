@@ -1,4 +1,4 @@
-use crate::game::app::App;
+use crate::data::Data;
 use crate::game::ecs::{Attributes, Liquid, Position};
 use crate::game::system::{GameActionType, GameActor};
 use specs::{Entities, Entity, ReadStorage, WriteStorage};
@@ -19,7 +19,7 @@ impl Default for Ai {
 impl Ai {
     pub fn schedule_ai_actions<'a>(
         &mut self,
-        app: &mut App,
+        app: &mut Data,
         entity: Entity,
         entities: &Entities<'a>,
         positions: &mut WriteStorage<'a, Position>,

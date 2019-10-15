@@ -1,35 +1,57 @@
 use std::fmt;
 use std::usize;
 use specs::Entity as SpecsEntity;
+use crate::color::{Color, Hue};
+use crate::game::grid::Grid;
+use crate::game::ecs::Rect;
 
-use tui::layout::Rect;
-use tui::style::Color;
-
-pub const LINE_BLOCK: &str = "█";
-pub const LINE_LIGHT_BOX: &str = "☐";
-pub const LINE_LIGHT_DOWN_AND_RIGHT: &str = "┌";
-pub const LINE_LIGHT_VERTICAL: &str = "│";
-pub const LINE_LIGHT_UP_AND_RIGHT: &str = "└";
-pub const LINE_LIGHT_HORIZONTAL: &str = "─";
-pub const LINE_LIGHT_UP_AND_LEFT: &str = "┘";
-pub const LINE_LIGHT_DOWN_AND_LEFT: &str = "┐";
-pub const LINE_LIGHT_VERTICAL_AND_RIGHT: &str = "├";
-pub const LINE_LIGHT_VERTICAL_AND_LEFT: &str = "┤";
-pub const LINE_LIGHT_HORIZONTAL_AND_UP: &str = "┴";
-pub const LINE_LIGHT_HORIZONTAL_AND_DOWN: &str = "┬";
-pub const LINE_LIGHT_VERTICAL_AND_HORIZONTAL: &str = "┼";
-pub const LINE_LIGHT_LEFT: &str = "╴";
-pub const LINE_LIGHT_RIGHT: &str = "╶";
-pub const LINE_LIGHT_UP: &str = "╵";
-pub const LINE_LIGHT_DOWN: &str = "╷";
-pub const MIDDLE_DOT: &str = "·";
+pub const BLANK: char = ' ';
+pub const LINE_BLOCK: char = '#';
+pub const LINE_LIGHT_BOX: char = '☐';
+pub const LINE_LIGHT_DOWN_AND_RIGHT: char = '┌';
+pub const LINE_LIGHT_VERTICAL: char = '│';
+pub const LINE_LIGHT_UP_AND_RIGHT: char = '└';
+pub const LINE_LIGHT_HORIZONTAL: char = '─';
+pub const LINE_LIGHT_UP_AND_LEFT: char = '┘';
+pub const LINE_LIGHT_DOWN_AND_LEFT: char = '┐';
+pub const LINE_LIGHT_VERTICAL_AND_RIGHT: char = '├';
+pub const LINE_LIGHT_VERTICAL_AND_LEFT: char = '┤';
+pub const LINE_LIGHT_HORIZONTAL_AND_UP: char = '┴';
+pub const LINE_LIGHT_HORIZONTAL_AND_DOWN: char = '┬';
+pub const LINE_LIGHT_VERTICAL_AND_HORIZONTAL: char = '┼';
+pub const LINE_LIGHT_LEFT: char = '╴';
+pub const LINE_LIGHT_RIGHT: char = '╶';
+pub const LINE_LIGHT_UP: char = '╵';
+pub const LINE_LIGHT_DOWN: char = '╷';
+pub const MIDDLE_DOT: char = '.';
+pub const GLYPHS: &'static [char] = &[
+            BLANK,
+            LINE_BLOCK,
+            LINE_LIGHT_DOWN_AND_RIGHT,
+            LINE_LIGHT_BOX,
+            LINE_LIGHT_VERTICAL,
+            LINE_LIGHT_UP_AND_RIGHT,
+            LINE_LIGHT_HORIZONTAL,
+            LINE_LIGHT_UP_AND_LEFT,
+            LINE_LIGHT_DOWN_AND_LEFT,
+            LINE_LIGHT_VERTICAL_AND_RIGHT,
+            LINE_LIGHT_VERTICAL_AND_LEFT,
+            LINE_LIGHT_HORIZONTAL_AND_UP,
+            LINE_LIGHT_HORIZONTAL_AND_DOWN,
+            LINE_LIGHT_VERTICAL_AND_HORIZONTAL,
+            LINE_LIGHT_LEFT,
+            LINE_LIGHT_RIGHT,
+            LINE_LIGHT_UP,
+            LINE_LIGHT_DOWN,
+            MIDDLE_DOT,
+        ];
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Entity {
-    pub character: String,
+    pub character: char,
     pub blocked: bool,
-    pub color: Color,
     pub id: SpecsEntity,
+    pub color: Color,
 }
 
 impl fmt::Display for Entity {
@@ -39,46 +61,48 @@ impl fmt::Display for Entity {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum CellType {
-    Floor(String),
-    Wall(String),
+pub enum TileType {
+    Floor,
+    Wall,
     Void,   
 }
 
-impl Default for CellType {
+impl Default for TileType {
     fn default() -> Self {
-        CellType::Void
+        TileType::Void
     }
 }
 
 /// A buffer cell
 #[derive(Debug, Clone, PartialEq)]
-pub struct Cell {
+pub struct Tile {
     pub entities: Vec<Entity>,
     pub blocked: bool,
     pub block_sight: bool,
-    pub explored: bool,
-    pub cell_type: CellType,
+    pub cell_type: TileType,
+    pub glyph: char,
     pub color: Color,
 }
 
-impl Cell {
+impl Tile {
     pub fn reset(&mut self) {
         self.entities.clear();
     }
 
     pub fn floor() -> Self {
-        Cell {
-            cell_type: CellType::Floor(MIDDLE_DOT.to_string()),
+        Tile {
+            cell_type: TileType::Floor,
+            glyph: MIDDLE_DOT,
             ..Default::default()
         }
     }
 
     pub fn wall() -> Self {
-        Cell {
+        Tile {
             blocked: true,
             block_sight: true,
-            cell_type: CellType::Wall(LINE_BLOCK.to_string()),
+            glyph: LINE_BLOCK,
+            cell_type: TileType::Wall,
             ..Default::default()
         }
     }
@@ -96,46 +120,50 @@ impl Cell {
     }
 }
 
-impl Default for Cell {
-    fn default() -> Cell {
-        Cell {
+impl Default for Tile {
+    fn default() -> Tile {
+        Tile {
             entities: vec![],
             blocked: false,
             block_sight: false,
-            explored: false,
-            cell_type: CellType::default(),
-            color: Color::Gray,
+            glyph: BLANK,
+            cell_type: TileType::default(),
+            color: Color::new(Hue::White, 128),
         }
     }
 }
 
-impl fmt::Display for Cell {
+impl fmt::Display for Tile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if let Some(entity) = self.entities.get(0) {
             write!(f, "{}", entity.character)
         } else {
-            match self.cell_type {
-                CellType::Void => {
-                    write!(f, " ")
-                },
-                CellType::Wall(ref c) => {
-                    write!(f, "{}", c)
-                },
-                CellType::Floor(ref c) => {
-                    write!(f, "{}", c)
-                }
-            }
+            write!(f, "{}", self.glyph)
         }
     }
 }
 
+pub type Level = Grid<Tile>;
+
+pub trait EntityGrid {
+    fn move_entity(&mut self, id: SpecsEntity, x1: i32, y1: i32, x2: i32, y2: i32);
+}
+
+impl EntityGrid for Level {
+    fn move_entity(&mut self, id: SpecsEntity, x1: i32, y1: i32, x2: i32, y2: i32) {
+        if let Some(entity) = self.get_mut(x1, y1).remove_entity(id) {
+            self.get_mut(x2, y2).add_entity(entity);
+        }
+    }
+}
+/*
 #[derive(Clone, PartialEq)]
 pub struct Level {
     /// The area represented by this buffer
     pub area: Rect,
     /// The content of the buffer. The length of this Vec should always be equal to area.width *
     /// area.height
-    pub content: Vec<Cell>,
+    pub content: Vec<Tile>,
     pub start: (u16, u16),
 }
 
@@ -166,14 +194,18 @@ impl fmt::Debug for Level {
 }
 
 impl Level {
+    pub fn glyphs() -> &'static [char] {
+        GLYPHS
+    }
+
     /// Returns a Level with all cells set to the default one
     pub fn empty(area: Rect) -> Level {
-        let cell: Cell = Default::default();
+        let cell: Tile = Default::default();
         Level::filled(area, &cell)
     }
 
-    /// Returns a Level with all cells initialized with the attributes of the given Cell
-    pub fn filled(area: Rect, cell: &Cell) -> Level {
+    /// Returns a Level with all cells initialized with the attributes of the given Tile
+    pub fn filled(area: Rect, cell: &Tile) -> Level {
         let start = (area.left(), area.top());
         let size = area.area() as usize;
         let mut content = Vec::with_capacity(size);
@@ -184,7 +216,7 @@ impl Level {
     }
 
     /// Returns the content of the buffer as a slice
-    pub fn content(&self) -> &[Cell] {
+    pub fn content(&self) -> &[Tile] {
         &self.content
     }
 
@@ -208,19 +240,19 @@ impl Level {
         }
     }
 
-    /// Returns a reference to Cell at the given coordinates
-    pub fn get(&self, x: u16, y: u16) -> &Cell {
+    /// Returns a reference to Tile at the given coordinates
+    pub fn get(&self, x: u16, y: u16) -> &Tile {
         let i = self.index_of(x, y);
         &self.content[i]
     }
 
-    /// Returns a mutable reference to Cell at the given coordinates
-    pub fn get_mut(&mut self, x: u16, y: u16) -> &mut Cell {
+    /// Returns a mutable reference to Tile at the given coordinates
+    pub fn get_mut(&mut self, x: u16, y: u16) -> &mut Tile {
         let i = self.index_of(x, y);
         &mut self.content[i]
     }
 
-    /// Returns the index in the Vec<Cell> for the given global (x, y) coordinates.
+    /// Returns the index in the Vec<Tile> for the given global (x, y) coordinates.
     ///
     /// Global coordinates are offset by the Level's area offset (`x`/`y`).
     pub fn index_of(&self, x: u16, y: u16) -> usize {
@@ -276,7 +308,7 @@ impl Level {
     /// Merge an other buffer into this one
     pub fn merge(&mut self, other: &Level) {
         let area = self.area.union(other.area);
-        let cell: Cell = Default::default();
+        let cell: Tile = Default::default();
         self.content.resize(area.area() as usize, cell.clone());
 
         // Move original content to the appropriate space
@@ -303,6 +335,7 @@ impl Level {
         self.area = area;
     }
 }
+*/
 
 #[cfg(test)]
 mod tests {

@@ -14,7 +14,7 @@ impl <'a> PathFinder<'a> {
     }
 
     fn move_cost(&self, _src: &Position, dst: &Position, target: &Position) -> u32 {
-        let level_cell = self.level.get(dst.x as u16, dst.y as u16);
+        let level_cell = self.level.get(dst.x, dst.y);
         if level_cell.blocked {
             std::u32::MAX
         } else if dst == target {

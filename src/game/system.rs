@@ -1,13 +1,11 @@
-use super::app::App;
+use crate::data::Data;
 use super::ecs::*;
 use super::events::*;
 use super::fov::Fov;
-use super::level::{CellType, Level};
+use super::level::{TileType, Level, EntityGrid};
 use super::path::PathFinder;
 use crate::ai::Ai;
-use slog::Logger;
 use specs::{Entities, Entity, ReadStorage, System, Write, WriteExpect, WriteStorage};
-use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlayerAction {
@@ -71,22 +69,19 @@ pub type GameActionQueue = Vec<GameAction>;
 pub type GameEventQueue = EventQueue<GameEvent>;
 
 pub struct GameSystem {
-    log: Arc<Logger>,
 }
 
 impl GameSystem {
-    pub fn new(log: Arc<Logger>) -> Self {
-        GameSystem { log: log }
+    pub fn new() -> Self {
+        GameSystem {}
     }
 }
 
 impl<'a> System<'a> for GameSystem {
     type SystemData = (
-        WriteExpect<'a, App>,
+        WriteExpect<'a, Data>,
         Write<'a, Ai>,
         Entities<'a>,
-        Write<'a, Level>,
-        WriteExpect<'a, Fov>,
         WriteStorage<'a, Position>,
         ReadStorage<'a, Character>,
         ReadStorage<'a, Attributes>,
@@ -95,20 +90,23 @@ impl<'a> System<'a> for GameSystem {
 
     fn run(
         &mut self,
-        (mut app, mut ai, entities, mut level, mut fov, mut positions, characters, attributes, liquids): Self::SystemData,
+        (mut app, mut ai, entities, mut positions, characters, attributes, liquids): Self::SystemData,
     ) {
         //use specs::Join;
 
         /*
          * loop:
+         *   if ai turn:
+         *     run ai
+         *   for each action:
+         *     handle action
+         *     end turn if needed
+         *     schedule wakeup if needed
          *   if not waiting for a human to take their turn:
          *     advance to next game time step
          *     evaluate game event
-         *     while ai turn:
-         *       run ai
-         *       process actions
          *   else:
-         *     break
+         *     break from loop
          */
 
         loop {
@@ -117,7 +115,7 @@ impl<'a> System<'a> for GameSystem {
              */
             match app.actor_turn() {
                 Some(GameActor::NonPlayer(entity)) => {
-                    debug!(self.log, "[{:?}] ai turn: {:?}", app.time, entity);
+                    debug!("[{:?}] ai turn: {:?}", app.time, entity);
                     ai.schedule_ai_actions(
                         &mut app,
                         entity,
@@ -134,6 +132,7 @@ impl<'a> System<'a> for GameSystem {
              * execute actions
              */
             while let Some(GameAction { actor, action, .. }) = app.next_action() {
+                info!("[{:?}] action {:?} by {:?}", app.time, action, actor);
                 let turn_status = match action {
                     GameActionType::Pass => TurnStatus::EndTurn(Time::default() + 1),
                     GameActionType::Stop => TurnStatus::Stop,
@@ -143,14 +142,12 @@ impl<'a> System<'a> for GameSystem {
                         y,
                         &mut app,
                         &entities,
-                        &mut level,
-                        &mut fov,
                         &mut positions,
                         &characters,
                         &attributes,
                     ),
                     GameActionType::Look(x, y) => {
-                        let path_finder = PathFinder::new(&level);
+                        let path_finder = PathFinder::new(&app.level);
                         let actor_pos = positions.get(actor.entity()).unwrap().clone();
                         let cursor_pos = if let Some(cursor) = app.cursor.clone() {
                             cursor.delta(x, y)
@@ -186,13 +183,17 @@ impl<'a> System<'a> for GameSystem {
                  * advance game timeline
                  */
                 if let Some((time, game_event)) = app.next_event() {
-                    info!(self.log, "[{:?}] {:?}", time, game_event);
+                    info!("[{:?}] {:?}", time, game_event);
 
                     match game_event {
                         GameEvent::Turn(actor) => {
                             app.new_turn(actor);
                         }
                     }
+                } else {
+                    warn!("[{:?}] game event queue empty and out of turns. stopping", app.time);
+                    app.stop = true;
+                    break;
                 }
             } else {
                 break;
@@ -213,10 +214,8 @@ impl GameSystem {
         actor: GameActor,
         x: i32,
         y: i32,
-        app: &mut WriteExpect<'a, App>,
+        app: &mut WriteExpect<'a, Data>,
         _entities: &Entities<'a>,
-        level: &mut Write<'a, Level>,
-        fov: &mut WriteExpect<'a, Fov>,
         positions: &mut WriteStorage<'a, Position>,
         _characters: &ReadStorage<'a, Character>,
         attributes: &ReadStorage<'a, Attributes>,
@@ -235,24 +234,22 @@ impl GameSystem {
         };
         let attrs = attributes.get(entity).unwrap();
 
-        match Collider::new(level).get(&new_pos) {
+        match Collider::new(&app.level).get(&new_pos) {
             Occupier::Empty => {
-                EntityMover::new(level).move_entity(entity, &mut pos, x, y);
+                EntityMover::new(&mut app.level).move_entity(entity, &mut pos, x, y);
                 if actor.is_player() {
-                    fov.compute(level, &new_pos, attrs.vision_radius);
+                    app.fov.compute(&new_pos, attrs.vision_radius);
                 }
                 TurnStatus::EndTurn(Time::default() + 1)
             }
             Occupier::Wall => {
                 debug!(
-                    self.log,
                     "[{:?}] path blocked by wall at {:?}", app.time, new_pos
                 );
                 TurnStatus::Continue
             }
             Occupier::Entity(target_entity) => {
                 debug!(
-                    self.log,
                     "[{:?}] entity {:?} interact with {:?}", app.time, entity, target_entity
                 );
                 TurnStatus::EndTurn(Time::default() + 1)
@@ -261,12 +258,12 @@ impl GameSystem {
     }
 }
 
-pub struct EntityMover<'a, 'b> {
-    level_map: &'a mut Write<'b, Level>,
+pub struct EntityMover<'a> {
+    level_map: &'a mut Level,
 }
 
-impl<'a, 'b> EntityMover<'a, 'b> {
-    pub fn new(level_map: &'a mut Write<'b, Level>) -> Self {
+impl<'a> EntityMover<'a> {
+    pub fn new(level_map: &'a mut Level) -> Self {
         EntityMover {
             level_map: level_map,
         }
@@ -275,10 +272,10 @@ impl<'a, 'b> EntityMover<'a, 'b> {
     pub fn move_entity(&mut self, entity: Entity, pos: &mut Position, x: i32, y: i32) {
         self.level_map.move_entity(
             entity,
-            pos.x as u16,
-            pos.y as u16,
-            (pos.x + x) as u16,
-            (pos.y + y) as u16,
+            pos.x,
+            pos.y,
+            pos.x + x,
+            pos.y + y,
         );
         pos.x += x;
         pos.y += y;
@@ -303,12 +300,12 @@ impl<'a> Collider<'a> {
     }
 
     pub fn get(&self, p: &Position) -> Occupier {
-        let level_cell = self.level_map.get(p.x as u16, p.y as u16);
+        let level_cell = self.level_map.get(p.x, p.y);
         if let Some(entity) = level_cell.entities.iter().find(|e| e.blocked) {
             Occupier::Entity(entity.id)
         } else {
             match level_cell.cell_type {
-                CellType::Wall(_) => Occupier::Wall,
+                TileType::Wall => Occupier::Wall,
                 _ => Occupier::Empty,
             }
         }
