@@ -2,6 +2,7 @@ use std::cmp;
 use rand::{self, Rng};
 use specs::{Entity, World, Builder};
 use specs::world::WorldExt;
+use crate::game::factions;
 use super::level::{self, Tile, TileType, Level};
 use crate::color::{Hue, Palette};
 use super::ecs::{AiController, Attributes, Character, Position, Rect, EntityIndex, Fighter, PlayerController};
@@ -218,6 +219,7 @@ fn place_objects(palette: &Palette, room: Rect, level_map: &mut Level, world: &m
                         alive: true,
                         max_hp: 10,
                         hp: 10,
+                        faction: factions::MONSTER.into(),
                         ..Default::default()
                     })
                     .with(AiController)
@@ -238,6 +240,7 @@ fn place_objects(palette: &Palette, room: Rect, level_map: &mut Level, world: &m
                         alive: true,
                         max_hp: 16,
                         hp: 16,
+                        faction: factions::MONSTER.into(),
                         ..Default::default()
                     })
                     .with(AiController)
@@ -280,6 +283,7 @@ pub fn create_player(palette: &Palette, level: &mut Level, fov: &mut Fov, world:
             max_hp: 30,
             hp: 30,
             vision_radius: vision_radius,
+            faction: factions::PLAYER.into(),
             ..Default::default()
         })
         .with(Fighter {

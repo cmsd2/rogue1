@@ -72,6 +72,7 @@ pub struct Attributes {
     pub max_hp: i32,
     pub hp: i32,
     pub vision_radius: u16,
+    pub faction: String,
 }
 
 impl Component for Attributes {

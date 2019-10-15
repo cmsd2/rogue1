@@ -8,6 +8,7 @@ use crate::game::fov::Fov;
 use crate::game::system::{GameActor, GameActionQueue, GameAction, GameActionType, GameEventQueue, GameEvent};
 use crate::game::events::{Time};
 use crate::game::ecs::{Position, Rect};
+use crate::game::factions::Factions;
 
 pub enum InputMode {
     Edit,
@@ -69,13 +70,14 @@ pub struct Data {
     pub cursor: Option<Position>,
     pub input_mode: InputMode,
     pub palette: Palette,
+    pub factions: Factions,
 }
 
 impl Data {
     pub fn new(world: &mut World) -> Self {
         let mut level = Level::empty(Rect::new_sized(40, 30));
         let palette = Palette::new();
-        level_gen::make_map(&palette, &mut level, world);
+        let entities = level_gen::make_map(&palette, &mut level, world);
         let mut fov = Fov::new(&level);
         let player = level_gen::create_player(&palette, &mut level, &mut fov, world);
         
@@ -92,9 +94,14 @@ impl Data {
             cursor: None,
             input_mode: InputMode::Play,
             palette: palette,
+            factions: Factions::new(),
         };
 
         data.new_turn(GameActor::Player(player));
+
+        for entity in entities {
+            data.schedule_turn(Time::new(1, 0), GameActor::NonPlayer(entity));
+        }
 
         data
     }

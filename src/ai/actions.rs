@@ -1,4 +1,5 @@
 use crate::game::ecs::{Attributes, Liquid, Position};
+use crate::data::Data;
 use rgoap::{self, Action, State};
 use specs::{Entities, Entity, ReadStorage, WriteStorage};
 use std::f32;
@@ -65,13 +66,15 @@ where
 #[derive(Clone, Debug)]
 pub struct Agent {
     pub turn_ended: bool,
+    pub position: Position,
     pub attributes: Attributes,
 }
 
 impl Agent {
-    pub fn new(attributes: Attributes) -> Self {
+    pub fn new(position: Position, attributes: Attributes) -> Self {
         Agent {
             turn_ended: false,
+            position: position,
             attributes: attributes,
         }
     }
@@ -92,11 +95,13 @@ pub enum AiActionType {
     Meditate,
     DrinkPotable(Entity),
     Get(Entity),
+    Attack(Entity),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AiPredicate {
     Have(Entity),
+    UnderThreat,
 }
 
 impl AiAction {
@@ -113,8 +118,10 @@ impl AiAction {
             cost: 1,
             utility: 1.0 - agent.attributes.calmness,
             action_type: AiActionType::Meditate,
-            pre_conditions: State::new(),
-            post_conditions: State::new(),
+            pre_conditions: State::new()
+                .with(AiPredicate::UnderThreat, false),
+            post_conditions: State::new()
+                .with(AiPredicate::UnderThreat, false),
         }
     }
 
@@ -139,11 +146,25 @@ impl AiAction {
             post_conditions: State::new().with(AiPredicate::Have(e), false),
         }
     }
+
+    pub fn attack(_agent: &Agent, e: Entity, threat: f32) -> AiAction {
+        AiAction {
+            name: format!("attack({:?})", e),
+            cost: 1,
+            utility: threat,
+            action_type: AiActionType::Attack(e),
+            pre_conditions: State::new()
+                .with(AiPredicate::UnderThreat, true),
+            post_conditions: State::new()
+                .with(AiPredicate::UnderThreat, false),
+        }
+    }
 }
 
 pub struct AiActions {
     pub agent: Agent,
     pub actions: Vec<AiAction>,
+    pub state: State<AiPredicate>,
 }
 
 impl AiActions {
@@ -151,6 +172,7 @@ impl AiActions {
         AiActions {
             agent: agent,
             actions: vec![],
+            state: State::new(),
         }
     }
 
@@ -164,6 +186,7 @@ impl AiActions {
 
     pub fn setup_actions<'a>(
         &mut self,
+        data: &mut Data,
         entities: &Entities<'a>,
         positions: &mut WriteStorage<'a, Position>,
         attributes: &ReadStorage<'a, Attributes>,
@@ -173,12 +196,32 @@ impl AiActions {
 
         self.add_action(AiAction::meditate(&self.agent));
 
-        for (e, _pos, _attr, liquid) in (entities, positions, attributes, liquids).join() {
-            if liquid.potable {
-                self.add_action(AiAction::drink(&self.agent, e));
-                self.add_action(AiAction::get(&self.agent, e));
+        for (e, pos, attr) in (entities, positions, attributes).join() {
+            if let Some(liquid) = liquids.get(e) {
+                if liquid.potable {
+                    self.add_action(AiAction::drink(&self.agent, e));
+                    self.add_action(AiAction::get(&self.agent, e));
+                }
+            }
+
+            let opinion = data.factions.get(&self.agent.attributes.faction, &attr.faction);
+            if opinion.is_hostile() {
+                // todo something more useful here
+                let threat = if data.fov.is_in_fov(self.agent.position.x, self.agent.position.y) {
+                    1.0
+                } else {
+                    0.0
+                };
+
+                if threat > 0.0 {
+                    self.state.insert(AiPredicate::UnderThreat, true);
+                }
+
+                self.add_action(AiAction::attack(&self.agent, e, threat));
             }
         }
+
+        info!("[{:?}] actions available: {:?}", data.time, self.actions);
     }
 
     pub fn find_max_utility<'a>(&'a self) -> Option<&'a AiAction> {
@@ -202,10 +245,9 @@ impl AiActions {
             self.actions.iter().map(|a| a.clone().action()).collect();
 
         if let Some(ai_action) = self.find_max_utility() {
-            let initial_state = State::new();
             let action = ai_action.clone().action();
 
-            let planned = rgoap::plan(&initial_state, &action.post_conditions, &possible_actions);
+            let planned = rgoap::plan(&self.state, &action.post_conditions, &possible_actions);
             planned.map(|actions| actions.iter().map(|action| action.name.clone()).collect())
         } else {
             None

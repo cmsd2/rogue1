@@ -1,6 +1,7 @@
 use crate::data::Data;
 use crate::game::ecs::{Attributes, Liquid, Position};
 use crate::game::system::{GameActionType, GameActor};
+use crate::game::path::PathFinder;
 use specs::{Entities, Entity, ReadStorage, WriteStorage};
 
 pub mod actions;
@@ -28,16 +29,30 @@ impl Ai {
     ) {
         // unimplemented
         let entity_attrs = attributes.get(entity).unwrap();
-        let agent = Agent::new(entity_attrs.clone());
+        let entity_position = positions.get(entity).map(|e| e.to_owned()).unwrap();
+        let agent = Agent::new(entity_position.clone(), entity_attrs.clone());
         let mut ai_actions = AiActions::new(agent);
-        ai_actions.setup_actions(entities, positions, attributes, liquids);
+        ai_actions.setup_actions(app, entities, positions, attributes, liquids);
 
         if let Some(actions) = ai_actions.plan() {
             if let Some(action) = actions.get(0) {
                 match action {
                     AiActionType::Meditate => {
                         app.action(GameActor::NonPlayer(entity), GameActionType::Pass);
-                    }
+                    },
+                    AiActionType::Attack(target) => {
+                        if let Some(target_position) = positions.get(*target) {
+                            let pathfinder = PathFinder::new(&app.level);
+                            if let Some((path, cost)) = pathfinder.path(&entity_position, target_position) {
+                                debug!("[{:?}] ai entity {:?} targetting {:?} on path ({:?},{})", app.time, entity, target, path, cost);
+                                assert!(path.get(0).unwrap() == &entity_position);
+                                let next_tile = path.get(1).unwrap();
+                                let x = next_tile.x - entity_position.x;
+                                let y = next_tile.y - entity_position.y;
+                                app.action(GameActor::NonPlayer(entity), GameActionType::MoveAttack(x, y));
+                            }
+                        }
+                    },
                     _ => {
                         // not implemented
                     }

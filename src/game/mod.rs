@@ -10,3 +10,4 @@ pub mod path;
 pub mod events;
 pub mod system;
 pub mod grid;
+pub mod factions;
