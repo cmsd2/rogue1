@@ -1,7 +1,7 @@
 use super::widget::Widget;
 use quicksilver::lifecycle::{Window};
 use quicksilver::geom::{Rectangle, Shape, Vector};
-use quicksilver::graphics::{Background, Image, Font, FontStyle};
+use quicksilver::graphics::{Background, Image};
 use quicksilver::Result;
 
 pub struct Picture {

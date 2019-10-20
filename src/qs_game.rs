@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::rc::Rc;
 use quicksilver::prelude::*;
 use quicksilver::graphics::View;
@@ -7,7 +6,6 @@ use crate::ai::Ai;
 use crate::scene::Scene;
 use crate::data::Data;
 use crate::game::ecs;
-use crate::game::ecs::Position;
 use crate::game::system::{GameActionType, GameActor, GameSystem};
 use crate::qs_ui::Tileset;
 use crate::data::GameText;

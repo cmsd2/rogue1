@@ -193,7 +193,7 @@ impl Data {
         }
     }
 
-    pub fn look_mode(&mut self, cursor: Position, path: Option<Vec<Position>>) {
+    pub fn look_mode(&mut self, cursor: Position, _path: Option<Vec<Position>>) {
         debug!("[{:?}] look at: {:?}", self.time, cursor);
         self.input_mode = InputMode::Look;
         self.cursor = Some(cursor.clone());

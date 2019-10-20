@@ -1,10 +1,8 @@
-use std::cmp;
-use specs::{Entities, ReadExpect, ReadStorage};
+use specs::{Entities, ReadStorage};
 use quicksilver::geom::{Rectangle, Vector};
-use quicksilver::graphics::Background;
 use quicksilver::lifecycle::Window;
 use quicksilver::Result;
-use crate::game::level::{Level, Tile, TileType};
+use crate::game::level::{Level, Tile};
 use crate::game::ecs::{Character, Position, Rect};
 use crate::game::fov::Fov;
 use crate::color::{Palette};

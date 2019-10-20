@@ -1,7 +1,6 @@
 use crate::data::Data;
 use super::ecs::*;
 use super::events::*;
-use super::fov::Fov;
 use super::level::{TileType, Level, EntityGrid};
 use super::path::PathFinder;
 use crate::ai::Ai;

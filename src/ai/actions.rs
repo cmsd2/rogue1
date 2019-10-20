@@ -196,7 +196,7 @@ impl AiActions {
 
         self.add_action(AiAction::meditate(&self.agent));
 
-        for (e, pos, attr) in (entities, positions, attributes).join() {
+        for (e, _pos, attr) in (entities, positions, attributes).join() {
             if let Some(liquid) = liquids.get(e) {
                 if liquid.potable {
                     self.add_action(AiAction::drink(&self.agent, e));

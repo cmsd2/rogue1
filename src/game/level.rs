@@ -1,9 +1,7 @@
 use std::fmt;
-use std::usize;
 use specs::Entity as SpecsEntity;
 use crate::color::{Color, Hue};
 use crate::game::grid::Grid;
-use crate::game::ecs::Rect;
 
 pub const BLANK: char = ' ';
 pub const LINE_BLOCK: char = '#';
@@ -340,6 +338,7 @@ impl Level {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::ecs::Rect;
 
     #[test]
     fn it_translates_to_and_from_coordinates() {

@@ -1,6 +1,6 @@
 use super::{Widget, Picture};
 use quicksilver::lifecycle::{Window};
-use quicksilver::geom::{Rectangle, Shape, Vector};
+use quicksilver::geom::{Rectangle, Vector};
 use quicksilver::graphics::{Font, FontStyle};
 use quicksilver::Result;
 

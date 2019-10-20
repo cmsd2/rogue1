@@ -140,7 +140,7 @@ fn is_wall(level_map: &Level, x: i32, y: i32) -> bool {
     }
 }
 
-fn carve_walls(level_map: &mut Level) {
+pub fn carve_walls(level_map: &mut Level) {
     let area = level_map.area().to_owned();
     for i in area.left()..area.right() {
         for j in area.top()..area.bottom() {
